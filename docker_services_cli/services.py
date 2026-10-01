@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: 2020 CERN.
 # SPDX-FileCopyrightText: 2024 Graz University of Technology.
 # SPDX-FileCopyrightText: 2025-2026 CESNET z.s.p.o.
+# SPDX-FileCopyrightText: 2026 KTH Royal Institute of Technology.
 # SPDX-License-Identifier: MIT
 
 """Services module."""
@@ -153,11 +154,49 @@ def _rustfs_s3_client():
     )
 
 
+def _rustfs_configure_bucket_cors(client, bucket):
+    """Configure local browser uploads only if the bucket has no CORS policy."""
+    from botocore.exceptions import ClientError
+
+    origins = [
+        origin.strip()
+        for origin in os.environ.get(
+            "S3_CORS_ALLOWED_ORIGINS", RUSTFS["CORS_ALLOWED_ORIGINS"]
+        ).split(",")
+        if origin.strip()
+    ]
+    if not origins:
+        return
+
+    try:
+        client.get_bucket_cors(Bucket=bucket)
+        return
+    except ClientError as error:
+        if error.response["Error"]["Code"] != "NoSuchCORSConfiguration":
+            raise
+
+    client.put_bucket_cors(
+        Bucket=bucket,
+        CORSConfiguration={
+            "CORSRules": [
+                {
+                    "AllowedOrigins": origins,
+                    "AllowedMethods": ["GET", "HEAD", "PUT", "POST", "DELETE"],
+                    "AllowedHeaders": ["*"],
+                    "ExposeHeaders": ["ETag"],
+                    "MaxAgeSeconds": 3600,
+                }
+            ]
+        },
+    )
+
+
 def rustfs_create_default_bucket(bucket="default", verbose=False):
     """Create the RustFS bucket used by default by Invenio's S3 storage.
 
     Unlike MinIO, RustFS does not auto-create buckets from directories present
-    on its data volume at startup, so this replicates that behaviour.
+    on its data volume at startup, so this replicates that behaviour. Configure
+    CORS for local browser uploads without replacing an existing bucket policy.
     """
     try:
         from botocore.exceptions import BotoCoreError, ClientError
@@ -173,18 +212,20 @@ def rustfs_create_default_bucket(bucket="default", verbose=False):
 
     try:
         client.create_bucket(Bucket=bucket)
-        return True
-    except (
-        # As of RustFS 1.0.0-rc.6, create_bucket is idempotent and never
-        # raises these. AWS S3 does, so handle them for forward compatibility
-        # in case RustFS aligns closer to AWS S3 semantics.
-        client.exceptions.BucketAlreadyOwnedByYou,
-        client.exceptions.BucketAlreadyExists,
-    ):
-        return True
+    except client.exceptions.BucketAlreadyOwnedByYou:
+        # Continue with CORS configuration for an existing owned bucket.
+        pass
     except (ClientError, BotoCoreError) as error:
         if verbose:
             click.secho(f"Could not create default bucket: {error}", fg="red")
+        return False
+
+    try:
+        _rustfs_configure_bucket_cors(client, bucket)
+        return True
+    except (ClientError, BotoCoreError) as error:
+        if verbose:
+            click.secho(f"Could not configure default bucket CORS: {error}", fg="red")
         return False
 
 

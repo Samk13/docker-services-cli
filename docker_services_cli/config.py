@@ -122,6 +122,12 @@ RUSTFS = {
     # note: rustfs is still pre-1.0 (release candidates like 1.0.0-rc.6), so we
     # track the floating "latest" tag for the 1.x line rather than pinning a rc
     "DEFAULT_VERSIONS": {"RUSTFS_1_LATEST": "latest"},
+    "CORS_ALLOWED_ORIGINS": (
+        "http://localhost,http://127.0.0.1,"
+        "https://localhost,https://127.0.0.1,"
+        "http://localhost:5000,http://127.0.0.1:5000,"
+        "https://localhost:5000,https://127.0.0.1:5000"
+    ),
     "CONTAINER_CONFIG_ENVIRONMENT_VARIABLES": {
         "S3_ACCESS_KEY_ID": "invenio",
         # rustfs needs at least 8 characters for the secret

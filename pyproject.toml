@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: 2020-2023 CERN.
 # SPDX-FileCopyrightText: 2022-2024 Graz University of Technology.
 # SPDX-FileCopyrightText: 2026 TU Wien.
+# SPDX-FileCopyrightText: 2026 KTH Royal Institute of Technology.
 # SPDX-License-Identifier: MIT
 
 [project]
@@ -37,6 +38,7 @@ s3 = [
   "botocore",
 ]
 tests = [
+  "botocore",
   "pytest-black>=0.6.0",
   "pytest-cov>=3.0.0",
   "pytest-isort>=3.0.0",
